@@ -1,0 +1,30 @@
+# Generated outputs
+outputs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Docs cache (auto-generated)
+.openscad_docs_cache.json
+
+# UI config (contains API keys)
+.openscad_ai_ui_config.json
+
+# OpenSCAD upstream source (vendored)
+openscad/
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
