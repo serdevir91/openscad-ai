@@ -203,4 +203,4 @@ See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the OpenSCAD WebAssembl
 
 ## License
 
-No license has been granted yet. Add an explicit license before accepting external contributions or redistributing modified builds.
+This project is licensed under the **GNU General Public License v3.0 or later** ([GPL-3.0-or-later](LICENSE)). See the [LICENSE](LICENSE) file for the full license text.
