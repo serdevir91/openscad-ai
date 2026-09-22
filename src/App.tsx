@@ -153,6 +153,7 @@ export default function App() {
 
         log(`Generating design with AI (${provider} · ${config.model || 'default'})…`);
         let currentCode = await generateInBrowser(config, prompt, code, image, activeSkillPrompts);
+        setCode(currentCode);
         log('Validating geometry with OpenSCAD WebAssembly…');
         let compiled: Artifact | null = null;
         let lastError = '';
@@ -169,6 +170,7 @@ export default function App() {
             }
             log(`Automatic repair (attempt ${attempt + 1})…`);
             currentCode = await generateInBrowser(config, prompt, currentCode, image, activeSkillPrompts, lastError);
+            setCode(currentCode);
           }
         }
 

@@ -22,7 +22,7 @@ function getWorker() {
     if (!request) return;
     pending.delete(event.data.id);
     if (!event.data.ok || !event.data.stl) {
-      request.reject(new Error(event.data.log || event.data.error || 'OpenSCAD WebAssembly compilation failed.'));
+      request.reject(new Error(event.data.error || event.data.log || 'OpenSCAD WebAssembly compilation failed.'));
       return;
     }
     request.resolve({ code: '', name: 'browser-model', stl: toBase64(event.data.stl) });
