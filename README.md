@@ -25,9 +25,13 @@
 
 ## Live web studio
 
-Open the **[interactive browser demo](https://serdevir91.github.io/openscad-ai/)** to edit OpenSCAD, change detected parameters, compile real geometry, inspect it in Three.js, and download SCAD or STL files. The official headless OpenSCAD engine runs as WebAssembly inside a background browser worker. Designs stay in the browser and no API key is requested.
+Open the **[interactive browser demo](https://serdevir91.github.io/openscad-ai/)** to generate 3D CAD designs from text or reference sketches, adjust detected parameters, compile real geometry with OpenSCAD WebAssembly, inspect it in Three.js, and export SCAD or STL files.
 
-GitHub Pages is static hosting, so local process integrations are intentionally available only in the desktop build: Codex CLI, Ollama, OpenSCAD desktop PNG export, selectable output folders, and cloud AI providers.
+- **In-Browser AI Generation**: You can use your own Google Gemini (free key available via [Google AI Studio](https://aistudio.google.com/app/apikey)) or OpenAI API key directly in the web app. Keys are stored strictly in client-side `localStorage` and sent directly to provider CORS endpoints.
+- **Client-Side OpenSCAD WASM Engine**: The official headless OpenSCAD engine runs via WebAssembly inside a background web worker. Geometry is compiled and validated completely locally within your browser tab.
+- **Self-Healing Auto-Repair**: If generated code fails OpenSCAD compilation, the web studio automatically feeds the compiler error back to the AI for iterative self-repair.
+
+*Note: Local process integrations (Codex CLI subprocess, local Ollama, and desktop PNG snapshots) require the native desktop application.*
 
 ## Features
 
@@ -176,7 +180,11 @@ cargo test --manifest-path src-tauri/Cargo.toml
 # Optimized executable without an installer
 npm run build:app
 
-# Windows installer
+# Inno Setup Windows installer (auto OpenSCAD download + optional Codex CLI)
+npm run build:installer
+# Or run installer\build-installer.bat
+
+# Standard Tauri build
 npm run tauri build
 ```
 
