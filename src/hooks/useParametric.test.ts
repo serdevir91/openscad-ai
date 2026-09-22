@@ -1,0 +1,2 @@
+import {describe,it,expect} from 'vitest';import {parameters,setParameter} from './useParametric';
+describe('SCAD parameters',()=>{it('excludes comments strings and scoped assignments',()=>{expect(parameters('// x=5;\n/* y=2; */\ntext="z=3;";\nwidth=50;\nmodule a(){inner=2;}\nfor(i=1; i<3; i=i+1) cube(i);').map(p=>p.name)).toEqual(['width']);});it('updates the exact occurrence without touching comments',()=>{const code='// width=50;\nwidth = -2.5;\ncube(width);';const p=parameters(code)[0];expect(setParameter(code,p,7)).toBe('// width=50;\nwidth = 7;\ncube(width);');});});

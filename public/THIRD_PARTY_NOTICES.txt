@@ -1,0 +1,6 @@
+OpenSCAD WebAssembly runtime
+Copyright the OpenSCAD contributors
+License: GNU General Public License v2.0
+Source: https://github.com/openscad/openscad
+WASM tooling: https://github.com/openscad/openscad-wasm
+Runtime: OpenSCAD-2025.03.25.wasm24456-WebAssembly-web.zip

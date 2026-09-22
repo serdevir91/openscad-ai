@@ -1,266 +1,206 @@
 <p align="center">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/OpenSCAD.svg/128px-OpenSCAD.svg.png" alt="OpenSCAD AI Logo" width="96">
+  <img src="src-tauri/icons/icon.png" alt="OpenSCAD AI" width="96">
 </p>
 
-<h1 align="center">OpenSCAD AI</h1>
+<h1 align="center">OpenSCAD AI v0.2</h1>
 
 <p align="center">
-  <strong>Transform natural language into 3D-printable OpenSCAD models — powered by AI.</strong>
+  A native AI-assisted parametric CAD studio built with Tauri 2, Rust, Three.js, and Monaco Editor.
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#demo">Demo</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#supported-providers">Providers</a> •
-  <a href="#configuration">Configuration</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="https://serdevir91.github.io/openscad-ai/"><strong>Launch the live web studio</strong></a> ·
+  <a href="#features">Features</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#codex-cli-without-an-api-key">Codex CLI</a> ·
+  <a href="#build">Build</a> ·
+  <a href="#security">Security</a>
 </p>
 
----
+<p align="center">
+  <a href="https://serdevir91.github.io/openscad-ai/"><img alt="Live demo" src="https://img.shields.io/badge/demo-open_in_browser-0284c7?style=for-the-badge"></a>
+  <a href="https://github.com/serdevir91/openscad-ai/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/serdevir91/openscad-ai/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/serdevir91/openscad-ai/actions/workflows/pages.yml"><img alt="Web studio" src="https://github.com/serdevir91/openscad-ai/actions/workflows/pages.yml/badge.svg"></a>
+</p>
 
-## ✨ Features
+## Live web studio
 
-- 🗣️ **Natural Language → SCAD**: Describe what you want in plain text, get valid OpenSCAD code
-- 🔄 **Auto-Repair**: Automatically retries and fixes code when OpenSCAD validation fails
-- 📚 **Documentation Context**: Injects official OpenSCAD docs into prompts for accurate code generation
-- 🖼️ **Image to Prompt**: Upload a reference image and let AI generate an OpenSCAD prompt from it
-- 🖥️ **Desktop UI**: Full-featured Tkinter GUI with integrated preview, file management, and log viewer
-- 🔌 **Multi-Provider**: Supports Gemini, OpenAI, Codex CLI, and local Ollama models
-- 📦 **Zero Dependencies**: Pure Python — only uses the standard library (no pip install required)
+Open the **[interactive browser demo](https://serdevir91.github.io/openscad-ai/)** to edit OpenSCAD, change detected parameters, compile real geometry, inspect it in Three.js, and download SCAD or STL files. The official headless OpenSCAD engine runs as WebAssembly inside a background browser worker. Designs stay in the browser and no API key is requested.
 
-## 🎬 Demo
+GitHub Pages is static hosting, so local process integrations are intentionally available only in the desktop build: Codex CLI, Ollama, OpenSCAD desktop PNG export, selectable output folders, and cloud AI providers.
 
+## Features
+
+- Natural-language and reference-image design generation
+- Local Codex CLI integration using your existing sign-in, with no API key required
+- Gemini, OpenAI, and local Ollama provider support
+- OpenSCAD compilation, geometry validation, STL generation, and automatic repair
+- GPU-accelerated Three.js STL viewport with orbit, pan, zoom, camera presets, materials, and wireframe mode
+- Monaco Editor with OpenSCAD syntax highlighting and `Ctrl+Enter` compilation
+- Collapsible assistant and code panels for a focused full-width viewport
+- Parametric controls generated from top-level OpenSCAD variables and `// [min:step:max]` metadata
+- Selectable persistent output folder
+- Native SCAD, STL, and PNG export dialogs
+- GitHub Pages web studio with real in-browser OpenSCAD WebAssembly compilation and SCAD/STL downloads
+- Dark, light, and pure-black AMOLED themes
+- Official OpenSCAD documentation cache with prompt-relevant context
+- Persistent custom CAD rules for print tolerances and modeling conventions
+
+## Architecture
+
+```text
+React + TypeScript
+├── Prompt, image, provider, model, and CAD-rule controls
+├── Monaco OpenSCAD editor
+├── Three.js STL viewport
+└── Typed Tauri IPC client
+            │
+            ▼
+Rust + Tauri 2
+├── OpenSCAD process runner and validation
+├── Generation and auto-repair pipeline
+├── Gemini / OpenAI / Ollama HTTP clients
+├── Local Codex CLI process adapter
+├── Documentation cache and context selection
+└── Safe configuration and output-file management
 ```
-You: "parametric phone stand with cable slot, 120mm height"
-  ↓
-AI generates OpenSCAD code
-  ↓
-OpenSCAD CLI validates the output
-  ↓
-✅ phone_stand.scad → ready for 3D printing!
-```
 
-## 🚀 Quick Start
+Python is not required by the application or its build process.
 
-### Prerequisites
+## Desktop app
 
-| Requirement | Details |
-|---|---|
-| **Python** | 3.9 or higher |
-| **OpenSCAD** | [Download here](https://openscad.org/downloads.html) — CLI must be accessible |
-| **AI Provider** | At least one: Gemini API key, OpenAI API key, Codex CLI, or local Ollama |
+## Quick start
 
-### Installation
+### Requirements
 
-```bash
-git clone https://github.com/YOUR_USERNAME/openscad-ai.git
+- Windows 10 or 11
+- [OpenSCAD](https://openscad.org/downloads.html)
+- Node.js 20 or newer
+- Current stable Rust toolchain
+- One AI provider:
+  - Codex CLI with an existing login
+  - Ollama running locally
+  - Gemini API key
+  - OpenAI API key
+
+### Clone and run
+
+```powershell
+git clone https://github.com/serdevir91/openscad-ai.git
 cd openscad-ai
+npm install
+npm run desktop
 ```
 
-No pip dependencies — the project uses only Python standard library modules.
-
-### Set Up Your API Key
-
-Choose your provider and set the environment variable:
-
-**Gemini** (recommended):
-```bash
-# Linux / macOS
-export GEMINI_API_KEY="your-key-here"
-
-# Windows PowerShell
-$env:GEMINI_API_KEY="your-key-here"
-```
-
-**OpenAI**:
-```bash
-export OPENAI_API_KEY="your-key-here"
-```
-
-**Ollama** (local, no key needed):
-```bash
-# Just make sure Ollama is running
-ollama serve
-```
-
-### Launch the UI
-
-```bash
-python openscad_ai_ui.py
-```
-
-Or on Windows:
-```powershell
-.\run-openscad-ai-ui.ps1
-```
-
-## 📖 Usage
-
-### Desktop UI (Recommended)
-
-The UI provides the full experience:
-
-- **Prompt Editor** — Write your model description
-- **Provider Selection** — Switch between Gemini, OpenAI, Codex, Ollama
-- **Model Picker** — Auto-fetches available models from your provider
-- **Image → Prompt** — Upload a reference image for automatic prompt generation
-- **Output Browser** — Double-click `.scad` files to open in OpenSCAD
-- **3D Preview** — Built-in STL/PNG preview with rotate & zoom
-- **File Management** — Delete individual files or entire model sets
-- **Auto Naming** — Generates descriptive filenames from your prompt
-- **API Key Masking** — Keys are masked in all log output
-
-### Command Line
-
-```bash
-# Basic generation
-python prompt_to_openscad.py --provider gemini --model gemini-3.1-flash-lite-preview \
-  "table leg with rounded base, height 120mm"
-
-# With documentation sync
-python prompt_to_openscad.py --sync-docs --provider gemini \
-  "parametric desk organizer with pen slots"
-
-# Sync docs cache only (no generation)
-python prompt_to_openscad.py --sync-docs-only
-
-# Using Ollama (local)
-python prompt_to_openscad.py --provider ollama --model qwen2.5-coder:7b \
-  "phone stand with cable slot"
-
-# Using Codex CLI
-python prompt_to_openscad.py --provider codex --model gpt-5.3-codex \
-  "parametric phone stand"
-
-# Disable doc context (debug)
-python prompt_to_openscad.py --no-doc-context --provider gemini \
-  "simple cube 20mm"
-```
-
-### PowerShell Wrapper
+To run the browser studio locally:
 
 ```powershell
-.\run-openscad-ai.ps1 -Prompt "parametric phone stand with cable hole" -Name "phone_stand"
-
-# Sync docs only
-.\run-openscad-ai.ps1 -SyncDocsOnly
+npm run web
 ```
 
-## 🔌 Supported Providers
+The first web run downloads a checksum-pinned OpenSCAD WebAssembly build from the official OpenSCAD file host. The generated runtime directory is ignored by Git.
 
-| Provider | Default Model | API Key Required | Notes |
-|---|---|---|---|
-| **Gemini** | `gemini-3.1-flash-lite-preview` | ✅ `GEMINI_API_KEY` | Recommended, fast and accurate |
-| **OpenAI** | `gpt-4.1-mini` | ✅ `OPENAI_API_KEY` | Full GPT-4 series support |
-| **Codex CLI** | `gpt-5.3-codex` | Via CLI login | Requires `codex` CLI installed |
-| **Ollama** | `qwen2.5-coder:7b` | ❌ Local only | Runs fully offline |
+After a release build, double-click `run-app.bat`. It automatically opens the release executable when one is available and falls back to development mode otherwise.
 
-## 📁 Project Structure
+## Codex CLI without an API key
 
-```
-openscad-ai/
-├── prompt_to_openscad.py      # Core CLI pipeline
-├── openscad_docs_context.py   # Official docs sync & context builder
-├── openscad_ai_ui.py          # Desktop GUI (Tkinter)
-├── run-openscad-ai.ps1        # PowerShell CLI wrapper
-├── run-openscad-ai-ui.ps1     # PowerShell UI launcher
-├── .gitignore
-├── AGENT.md                   # AI agent reference doc
-├── TASKS.md                   # Development task tracker
-└── outputs/                   # Generated .scad files (gitignored)
-```
+OpenSCAD AI can call the locally installed Codex CLI directly. It does not need an OpenAI API key for this provider.
 
-## ⚙️ Configuration
+1. Install the Codex CLI.
+2. Run `codex login` in a terminal and complete the normal sign-in flow.
+3. Open **Settings → Codex CLI** and click **Check connection**.
+4. Select **Codex** in the design assistant.
+5. Enter a model ID available to your Codex account.
 
-### UI Configuration
+The app launches `codex exec` with an ephemeral, read-only sandbox and passes the design prompt over standard input. Authentication remains owned by the local Codex CLI installation.
 
-The UI automatically saves your settings (provider, model, output directory) to `.openscad_ai_ui_config.json`. This file is **gitignored** to prevent accidental API key leaks.
+## Using the workspace
 
-### CLI Options
+1. Describe the object in the assistant panel or attach a PNG, JPEG, or WebP reference.
+2. Choose a provider and model. Enabled design rules are added to the generation request.
+3. Generate the design. The Rust core validates the returned SCAD with OpenSCAD and repairs compiler failures up to the configured limit.
+4. Inspect the STL in the viewport. Hide the code editor when you want a full-width geometry view.
+5. Edit code directly or change detected parameters. Press `Ctrl+Enter` to compile.
+6. Export SCAD, STL, or PNG, or open an automatically saved model from the selected output folder.
 
-| Flag | Default | Description |
+## Output folder
+
+Open **Settings → Files & rendering → Output folder** and select any writable local folder. The choice persists between launches. Restoring the application default stores generated files under the operating system application-data directory.
+
+## Providers
+
+| Provider | Authentication | Endpoint or process |
 |---|---|---|
-| `--provider` | `gemini` | AI provider (`gemini`, `openai`, `codex`, `ollama`) |
-| `--model` | Provider default | Model name |
-| `--output-dir` | `outputs` | Output directory for generated files |
-| `--name` | `model` | Base filename for output |
-| `--max-fix-attempts` | `2` | Auto-fix retry count on validation errors |
-| `--openscad-path` | Auto-detect | Path to OpenSCAD executable |
-| `--sync-docs` | off | Force refresh official docs cache |
-| `--sync-docs-only` | off | Only sync docs, skip generation |
-| `--no-doc-context` | off | Disable documentation context injection |
-| `--docs-cache` | `.openscad_docs_cache.json` | Cache file path |
-| `--docs-max-age-hours` | `168` (7 days) | Auto-refresh interval |
-| `--docs-context-chars` | `3500` | Max doc context characters |
+| Codex CLI | Existing local `codex login` session | Local `codex exec` process |
+| Ollama | None | `http://127.0.0.1:11434` |
+| Gemini | `GEMINI_API_KEY` or local Settings | Google Gemini REST API |
+| OpenAI | `OPENAI_API_KEY` or local Settings | OpenAI Chat Completions API |
 
-## 🔒 Security
+Environment variables are preferred for cloud-provider keys:
 
-- **API keys** are stored locally in `.openscad_ai_ui_config.json` (gitignored)
-- Keys are **masked** in all UI log output
-- No keys are hardcoded in source code
-- The project uses environment variables as the primary key source
-
-## 🔧 How It Works
-
-```
-┌─────────────┐     ┌─────────────────┐     ┌───────────────┐
-│  User Prompt │────▶│  Docs Context   │────▶│  AI Provider  │
-│  (text/image)│     │  (auto-cached)  │     │  (API call)   │
-└─────────────┘     └─────────────────┘     └───────┬───────┘
-                                                     │
-                                                     ▼
-                                            ┌───────────────┐
-                                            │  SCAD Code    │
-                                            │  (generated)  │
-                                            └───────┬───────┘
-                                                     │
-                                                     ▼
-                                            ┌───────────────┐
-                                            │  OpenSCAD CLI │
-                                            │  (validate)   │
-                                            └───────┬───────┘
-                                                     │
-                                              ┌──────┴──────┐
-                                              │             │
-                                           ✅ Pass      ❌ Fail
-                                              │             │
-                                              ▼             ▼
-                                         Save .scad    Auto-repair
-                                                       (retry up to
-                                                        N times)
+```powershell
+$env:GEMINI_API_KEY = "your-key"
+$env:OPENAI_API_KEY = "your-key"
 ```
 
-1. **Prompt Enrichment** — Your prompt is combined with relevant official OpenSCAD documentation
-2. **AI Generation** — The enriched prompt is sent to your chosen AI provider
-3. **Validation** — Generated code is validated using OpenSCAD CLI
-4. **Auto-Repair** — If validation fails, the error context is fed back to the AI for automatic fixing
-5. **Output** — Validated `.scad` file is saved, ready to open in OpenSCAD or slice for 3D printing
+Do not put real values in `.env.example` or commit local settings files.
 
-## 📝 Notes
+## Build
 
-- Official docs cache auto-refreshes every 7 days
-- OpenSCAD path is auto-detected on Windows; use `--openscad-path` if needed
-- Large documentation context increases token usage — adjust with `--docs-context-chars`
-- The `openscad/` directory (if present) contains the upstream OpenSCAD source and is gitignored
+```powershell
+# Frontend checks
+npm test
+npm run build
 
-## 🤝 Contributing
+# GitHub Pages web build with OpenSCAD WASM
+npm run build:web
 
-Contributions are welcome! Please:
+# Rust tests
+cargo test --manifest-path src-tauri/Cargo.toml
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+# Optimized executable without an installer
+npm run build:app
 
-## 📄 License
+# Windows installer
+npm run tauri build
+```
 
-This project is open source. See the repository for license details.
+The optimized executable is written to:
 
----
+```text
+src-tauri/target/release/openscad-ai.exe
+```
 
-<p align="center">
-  Made with ❤️ for the 3D printing & OpenSCAD community
-</p>
+## Configuration
+
+Settings are saved atomically to `.openscad_ai_config.json` in the operating system application-data directory. The project directory never receives runtime API keys. Theme, output folder, provider, model, executable paths, and repair limits persist across launches.
+
+## Security
+
+- Runtime configuration, `.env` files, key material, generated models, build output, and executables are ignored by Git.
+- API keys are never printed to the operation log.
+- Codex CLI and Ollama require no API key in this application.
+- Output-file reads validate names and remain inside the selected output directory.
+- External processes have explicit timeouts and are terminated when cancelled.
+- GitHub Actions runs frontend tests, Rust tests, production builds, and a Gitleaks scan.
+- The web build downloads OpenSCAD WASM from the official OpenSCAD host and rejects it unless its SHA-256 checksum matches the pinned value.
+
+Enable the repository's local pre-commit secret check once after cloning:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+See [SECURITY.md](SECURITY.md) for reporting instructions and the repository's secret-handling policy.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the OpenSCAD WebAssembly runtime attribution and source links.
+
+## Development notes
+
+- `src/` contains the React application.
+- `src-tauri/src/` contains Rust commands and services.
+- `src-tauri/capabilities/default.json` contains the minimal Tauri capability set.
+- `dist/`, `node_modules/`, `src-tauri/target/`, generated outputs, and all local configuration are intentionally excluded from version control.
+
+## License
+
+No license has been granted yet. Add an explicit license before accepting external contributions or redistributing modified builds.

@@ -1,34 +1,31 @@
-# OpenSCAD AI - Gorev Listesi
+# OpenSCAD AI 2.0 Status
 
-> Son guncelleme: 2026-04-05
+Last updated: 2026-09-21
 
----
+## Complete
 
-## Gorevler
+- [x] Tauri 2 desktop shell and Rust application core
+- [x] React, TypeScript, Monaco Editor, and Three.js workspace
+- [x] OpenSCAD detection, compilation, STL validation, and PNG export
+- [x] Gemini, OpenAI, Ollama, and API-key-free local Codex CLI providers
+- [x] Automatic compiler-error repair loop
+- [x] Reference-image analysis
+- [x] Official OpenSCAD documentation cache and context selection
+- [x] Parametric variables with editable range metadata
+- [x] Collapsible assistant and code panels
+- [x] Persistent dark, light, and AMOLED themes
+- [x] User-selectable persistent output directory
+- [x] Custom design skills and rules
+- [x] Native export dialogs and saved-model browser
+- [x] English interface and error messages
+- [x] CI tests and secret scanning
+- [x] GitHub-ready documentation and ignore rules
 
-### 1. 🚀 OpenSCAD resmi dokuman entegrasyonu ✅
-- [x] Mevcut prompt -> AI -> OpenSCAD akisinin analiz edilmesi
-- [x] Resmi dokumanlari cacheleyen modulun eklenmesi
-- [x] Prompt olusturma katmanina dokuman baglaminin enjekte edilmesi
-- [x] AGENT.md ve TASKS.md dokumantasyon dosyalarinin olusturulmasi
-- [x] Degisikliklerin syntax ve problem kontrolu ile dogrulanmasi
+## Release checks
 
-### 2. 🔧 SCAD-only cikti modu ✅
-- [x] Uretim akisinin STL/PNG export olmadan sadece SCAD yazmasi
-- [x] UI/Wrapper akisinin yeni davranisa hizalanmasi
-- [x] Dokumantasyonun SCAD-only davranisa gore guncellenmesi
-- [x] Degisikliklerin syntax ve calisma kontrolunun yapilmasi
-
----
-
-## Tamamlanma Durumu: 9/9 ✅
-
-## Degisen Dosyalar
-- openscad_docs_context.py - resmi OpenSCAD dokumanlarini senkronize eden ve prompta gore context secen yeni modul
-- prompt_to_openscad.py - SCAD-only ciktiya gecildi; STL/PNG export adimlari kaldirildi
-- openscad_ai_ui.py - UI komut akisi SCAD-only uretime hizalandi
-- README.md - SCAD-only davranis ve guncel kullanim secenekleri dokumante edildi
-- run-openscad-ai.ps1 - PNG parametresi kaldirildi, SCAD-only wrapper akisina hizalandi
-- .gitignore - generated docs cache dosyasi ignore listesine eklendi
-- AGENT.md - proje referans dosyasi SCAD-only davranisa gore guncellendi
-- TASKS.md - aktif gorev takibi guncellendi
+```powershell
+rtk npm test
+rtk npm run build
+rtk cargo test --manifest-path src-tauri/Cargo.toml
+rtk npm run build:app
+```

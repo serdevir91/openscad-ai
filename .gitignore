@@ -14,9 +14,25 @@ build/
 
 # UI config (contains API keys)
 .openscad_ai_ui_config.json
+.openscad_ai_config.json
+
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*service-account*.json
+secrets.*
 
 # OpenSCAD upstream source (vendored)
 openscad/
+
+# Local rewrite archive (never distributed)
+legacy_python/
 
 # OS files
 Thumbs.db
@@ -28,3 +44,11 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Tauri / web tooling
+node_modules/
+public/openscad/
+src-tauri/target/
+src-tauri/gen/
+*.exe
+docs-cache.json
