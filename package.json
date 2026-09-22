@@ -1,1 +1,53 @@
-{"name":"openscad-ai","version":"0.2.0","description":"Native AI-assisted parametric CAD studio built with Tauri, Rust, Three.js, and Monaco Editor.","private":true,"license":"GPL-3.0-or-later","author":"serdevir91","repository":{"type":"git","url":"https://github.com/serdevir91/openscad-ai.git"},"homepage":"https://serdevir91.github.io/openscad-ai/","engines":{"node":">=20"},"type":"module","scripts":{"start":"tauri dev","dev":"tauri dev","desktop":"tauri dev","app":"tauri dev","dev:frontend":"vite --host 127.0.0.1","preweb":"npm run setup:wasm","web":"vite --host 127.0.0.1","setup:wasm":"node scripts/fetch-openscad-wasm.mjs","build":"tsc && vite build","build:web":"npm run setup:wasm && tsc && vite build --mode web","build:app":"tauri build --no-bundle","test":"vitest run","tauri":"tauri"},"dependencies":{"@monaco-editor/react":"^4.7","@tauri-apps/api":"^2","lucide-react":"^0.468","monaco-editor":"^0.52","react":"^19","react-dom":"^19","three":"^0.180"},"devDependencies":{"@tauri-apps/cli":"^2","@types/node":"^22.20.2","@types/react":"^19","@types/react-dom":"^19","@types/three":"^0.180","@vitejs/plugin-react":"^4.4","typescript":"~5.8.3","vite":"^6.3","vitest":"^4.1.11"}}
+{
+  "name": "openscad-ai",
+  "version": "0.2.0",
+  "description": "Native AI-assisted parametric CAD studio built with Tauri, Rust, Three.js, and Monaco Editor.",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "author": "serdevir91",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/serdevir91/openscad-ai.git"
+  },
+  "homepage": "https://serdevir91.github.io/openscad-ai/",
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "tauri dev",
+    "dev": "tauri dev",
+    "desktop": "tauri dev",
+    "app": "tauri dev",
+    "dev:frontend": "vite --host 127.0.0.1",
+    "preweb": "npm run setup:wasm",
+    "web": "vite --host 127.0.0.1",
+    "setup:wasm": "node scripts/fetch-openscad-wasm.mjs",
+    "build": "tsc && vite build",
+    "build:web": "npm run setup:wasm && tsc && vite build --mode web",
+    "build:app": "tauri build --no-bundle",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File installer/build-installer.ps1",
+    "test": "vitest run",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7",
+    "@tauri-apps/api": "^2",
+    "lucide-react": "^0.468",
+    "monaco-editor": "^0.52",
+    "react": "^19",
+    "react-dom": "^19",
+    "three": "^0.180"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^22.20.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.180",
+    "@vitejs/plugin-react": "^4.4",
+    "typescript": "~5.8.3",
+    "vite": "^6.3",
+    "vitest": "^4.1.11"
+  }
+}

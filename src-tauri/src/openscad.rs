@@ -19,6 +19,24 @@ pub fn detect(explicit: &str) -> Result<PathBuf, String> {
             Err("The OpenSCAD path was not found".into())
         };
     }
+    if let Ok(env_path) = std::env::var("OPENSCAD_PATH") {
+        let p = PathBuf::from(env_path);
+        if p.is_file() {
+            return Ok(p);
+        }
+    }
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(dir) = current_exe.parent() {
+            let local1 = dir.join("openscad.exe");
+            if local1.is_file() {
+                return Ok(local1);
+            }
+            let local2 = dir.join("openscad").join("openscad.exe");
+            if local2.is_file() {
+                return Ok(local2);
+            }
+        }
+    }
     for p in [
         r"C:\Program Files\OpenSCAD\openscad.exe",
         r"C:\Program Files (x86)\OpenSCAD\openscad.exe",

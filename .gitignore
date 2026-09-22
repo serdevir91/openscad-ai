@@ -7,6 +7,7 @@ __pycache__/
 *.pyo
 *.egg-info/
 dist/
+dist-installer/
 build/
 
 # Docs cache (auto-generated)

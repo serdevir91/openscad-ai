@@ -69,6 +69,21 @@ Python is not required by the application or its build process.
 
 ## Desktop app
 
+### Windows Installer (Inno Setup)
+
+An all-in-one Windows installer setup script is provided under `installer/`:
+- Bundles the native **OpenSCAD AI** desktop application.
+- Automatically detects an existing OpenSCAD installation; if missing, it downloads and silently installs the official **OpenSCAD 3D Engine**.
+- Offers an optional checkbox to install **Codex CLI** (`@openai/codex`) via npm.
+- Creates clean Start Menu, Web Studio, and Desktop shortcuts with bilingual support (Turkish & English).
+
+To build the setup executable:
+```powershell
+npm run build:installer
+# Or double-click installer\build-installer.bat
+```
+Output: `dist-installer/OpenSCAD-AI-Setup-0.2.0.exe`
+
 ## Quick start
 
 ### Requirements
