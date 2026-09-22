@@ -58,7 +58,14 @@ export default function SettingsModal(p: Props) {
         <button className="icon-button" disabled={pending} title="Close settings" onClick={p.onClose}><X size={18} /></button>
       </div>
       <div className="settings-scroll">
-        {!p.nativeAvailable && <div className="browser-settings-note"><ShieldCheck size={16} /><span>The web studio keeps processing in your browser. Local paths, Codex CLI, cloud providers, and documentation sync are available in the desktop app.</span></div>}
+        {!p.nativeAvailable && (
+          <div className="browser-settings-note">
+            <ShieldCheck size={16} />
+            <span>
+              Web Studio runs OpenSCAD WebAssembly locally in this browser tab. Add your free Google Gemini key or OpenAI key below to enable AI model generation directly in your browser!
+            </span>
+          </div>
+        )}
         <section className="settings-section">
           <div className="settings-section-title"><Sun size={16} /><div><h3>Appearance</h3><p>Choose the canvas that feels best for long CAD sessions.</p></div></div>
           <div className="theme-grid">
@@ -73,7 +80,7 @@ export default function SettingsModal(p: Props) {
           <button type="button" className="text-button" disabled={pending || !draft.output_dir || !p.nativeAvailable} onClick={() => setDraft({ ...draft, output_dir: '' })}>Restore application default</button>
           <div className="settings-grid two">
             <label className="settings-field"><span>OpenSCAD executable</span><input disabled={pending || !p.nativeAvailable} value={draft.openscad_path} placeholder={p.nativeAvailable ? 'Auto-detect' : 'Built-in WebAssembly'} onChange={e => setDraft({ ...draft, openscad_path: e.target.value })} /></label>
-            <label className="settings-field"><span>Auto-repair attempts</span><input disabled={pending || !p.nativeAvailable} type="number" min="0" max="5" value={draft.max_repairs} onChange={e => setDraft({ ...draft, max_repairs: Math.max(0, Math.min(5, Number(e.target.value))) })} /></label>
+            <label className="settings-field"><span>Auto-repair attempts</span><input disabled={pending} type="number" min="0" max="5" value={draft.max_repairs} onChange={e => setDraft({ ...draft, max_repairs: Math.max(0, Math.min(5, Number(e.target.value))) })} /></label>
           </div>
         </section>
         <section className="settings-section codex-section" aria-disabled={!p.nativeAvailable}>
@@ -82,14 +89,73 @@ export default function SettingsModal(p: Props) {
           {codexStatus && <div className={`connection-result ${codexStatus.ok ? 'success' : 'failure'}`}>{codexStatus.ok ? <CheckCircle2 size={15} /> : <X size={15} />}<span>{codexStatus.text}</span></div>}
           <p className="settings-hint">First-time setup: install the Codex CLI, run <code>codex login</code> in a terminal, then choose <b>Codex</b> as the provider. No provider API key is stored by this app.</p>
         </section>
-        {p.nativeAvailable && <details className="settings-section cloud-section">
-          <summary><div className="settings-section-title"><KeyRound size={16} /><div><h3>Optional cloud providers</h3><p>Gemini and OpenAI keys are only needed when those providers are selected.</p></div></div></summary>
+        <details className="settings-section cloud-section" open={!p.nativeAvailable || Boolean(draft.gemini_key || draft.openai_key)}>
+          <summary>
+            <div className="settings-section-title">
+              <KeyRound size={16} />
+              <div>
+                <h3>AI Cloud Providers {p.nativeAvailable ? '(Optional)' : '(Browser AI Generation)'}</h3>
+                <p>
+                  {p.nativeAvailable
+                    ? 'Gemini and OpenAI keys are only needed when those providers are selected.'
+                    : 'Enter your API key to generate 3D models with AI directly in this browser.'}
+                </p>
+              </div>
+            </div>
+          </summary>
           <div className="settings-grid two cloud-fields">
-            <label className="settings-field"><span>Gemini API key</span><input disabled={pending} autoComplete="off" type="password" value={draft.gemini_key} placeholder="Use GEMINI_API_KEY instead" onChange={e => setDraft({ ...draft, gemini_key: e.target.value })} /></label>
-            <label className="settings-field"><span>OpenAI API key</span><input disabled={pending} autoComplete="off" type="password" value={draft.openai_key} placeholder="Use OPENAI_API_KEY instead" onChange={e => setDraft({ ...draft, openai_key: e.target.value })} /></label>
+            <label className="settings-field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span>Gemini API key</span>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: '10px', color: 'var(--accent)', textDecoration: 'underline', fontWeight: 600 }}
+                >
+                  Get free key (Google AI Studio) ↗
+                </a>
+              </div>
+              <input
+                disabled={pending}
+                autoComplete="off"
+                type="password"
+                value={draft.gemini_key}
+                placeholder="AIzaSy..."
+                onChange={e => setDraft({ ...draft, gemini_key: e.target.value })}
+              />
+            </label>
+            <label className="settings-field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span>OpenAI API key</span>
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: '10px', color: 'var(--accent)', textDecoration: 'underline', fontWeight: 600 }}
+                >
+                  Get OpenAI key ↗
+                </a>
+              </div>
+              <input
+                disabled={pending}
+                autoComplete="off"
+                type="password"
+                value={draft.openai_key}
+                placeholder="sk-..."
+                onChange={e => setDraft({ ...draft, openai_key: e.target.value })}
+              />
+            </label>
           </div>
-          <div className="privacy-note"><ShieldCheck size={16} /><span>Keys are written only to the local application data directory. They are never placed in the project folder or included in Git.</span></div>
-        </details>}
+          <div className="privacy-note">
+            <ShieldCheck size={16} />
+            <span>
+              {p.nativeAvailable
+                ? 'Keys are written only to your local application data directory. They are never included in Git.'
+                : 'Keys entered in browser mode are stored securely in your browser (localStorage) and sent directly to Google or OpenAI. They are never sent to any server.'}
+            </span>
+          </div>
+        </details>
       </div>
       <div className="settings-footer"><button disabled={pending || !p.nativeAvailable} onClick={() => void act(p.onSync)}><BookOpen size={16} />Refresh documentation</button><div><button disabled={pending} onClick={p.onClose}>Cancel</button><button disabled={pending} className="primary" onClick={() => void act(() => p.onSave(draft))}>{pending ? 'Saving…' : 'Save changes'}</button></div></div>
     </section>

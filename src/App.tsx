@@ -12,6 +12,7 @@ import SkillsModal from './components/SkillsModal';
 import { useSkills } from './hooks/useSkills';
 import { commands, defaults, desktop, type Config, type Artifact, type ReferenceImage, type SavedModel } from './hooks/useTauriCommands';
 import { base64ToBytes, compileInBrowser, downloadBrowserFile } from './browserOpenScad';
+import { generateInBrowser, analyzeImageInBrowser, fetchBrowserModels } from './browserAi';
 
 const initial = `// Parametric desk tray · dimensions in mm
 width = 90; // [30:1:180]
@@ -27,10 +28,16 @@ difference() {
 }
 `;
 
+const STORAGE_CONFIG_KEY = 'openscad-ai-config';
 function storedCode() { try { return localStorage.getItem('scad-draft') ?? initial; } catch { return initial; } }
 function storedConfig(): Config {
   if (desktop) return defaults;
   try {
+    const raw = localStorage.getItem(STORAGE_CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...defaults, ...parsed };
+    }
     const theme = localStorage.getItem('openscad-ai-theme');
     return theme === 'dark' || theme === 'light' || theme === 'amoled' ? { ...defaults, theme } : defaults;
   } catch { return defaults; }
@@ -103,14 +110,74 @@ export default function App() {
     setBusy(true); setError('');
     try { await task(); } catch (e) { fail(e); } finally { operation.current = false; setBusy(false); }
   }
+  function updateConfig(c: Config) {
+    setConfig(c);
+    if (!desktop) {
+      try {
+        localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(c));
+        localStorage.setItem('openscad-ai-theme', c.theme);
+      } catch {}
+    }
+  }
+
   async function work(kind: 'generate' | 'render') {
     if (!desktop) {
       await run(async () => {
-        log('Compiling with OpenSCAD WebAssembly…');
-        const compiled = await compileInBrowser(code);
-        setArtifact(compiled);
-        setStatus('OpenSCAD WASM ready');
-        log('browser-model.stl · ready');
+        if (kind === 'render') {
+          log('Compiling with OpenSCAD WebAssembly…');
+          const compiled = await compileInBrowser(code);
+          setArtifact(compiled);
+          setStatus('OpenSCAD WASM ready');
+          log('browser-model.stl · ready');
+          return;
+        }
+
+        if (!prompt.trim()) {
+          throw new Error('Please enter a prompt describing the model you want to generate.');
+        }
+
+        const provider = config.provider || 'gemini';
+        const hasKey = provider === 'gemini'
+          ? Boolean(config.gemini_key?.trim())
+          : Boolean(config.openai_key?.trim());
+
+        if (!hasKey) {
+          setSettings(true);
+          const link = provider === 'gemini'
+            ? 'https://aistudio.google.com/app/apikey'
+            : 'https://platform.openai.com/api-keys';
+          throw new Error(
+            `Please add your ${provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} API key in Settings to generate models with AI in the browser. Get key: ${link}`
+          );
+        }
+
+        log(`Generating design with AI (${provider} · ${config.model || 'default'})…`);
+        let currentCode = await generateInBrowser(config, prompt, code, image, activeSkillPrompts);
+        log('Validating geometry with OpenSCAD WebAssembly…');
+        let compiled: Artifact | null = null;
+        let lastError = '';
+
+        const maxRepairs = Math.max(0, Math.min(5, config.max_repairs ?? 2));
+        for (let attempt = 0; attempt <= maxRepairs; attempt++) {
+          try {
+            compiled = await compileInBrowser(currentCode);
+            break;
+          } catch (e) {
+            lastError = (e as Error).message || String(e);
+            if (attempt === maxRepairs) {
+              throw new Error(`Auto-repair limit reached: ${lastError}`);
+            }
+            log(`Automatic repair (attempt ${attempt + 1})…`);
+            currentCode = await generateInBrowser(config, prompt, currentCode, image, activeSkillPrompts, lastError);
+          }
+        }
+
+        if (compiled) {
+          setArtifact(compiled);
+          setCode(compiled.code);
+          setStatus('OpenSCAD WASM ready');
+          log('Geometry validated · OpenSCAD model ready');
+        }
       });
       return;
     }
@@ -126,9 +193,9 @@ export default function App() {
   }
   async function saveSettings(c: Config) {
     if (!desktop) {
-      setConfig(c);
+      updateConfig(c);
       setSettings(false);
-      try { localStorage.setItem('openscad-ai-theme', c.theme); } catch {}
+      log('Settings saved.');
       return;
     }
     try {
@@ -148,12 +215,16 @@ export default function App() {
     reader.readAsDataURL(file);
   }
   async function refreshModels() {
-    if (!desktop) {
-      log('AI model discovery is available in the desktop app. Browser compilation uses OpenSCAD WebAssembly.');
-      return;
-    }
     setLoadingModels(true);
-    try { const names = await commands.models(config); setModels(names); log(`${names.length} models found. Choose one from the model field.`); } catch (e) { fail(e); } finally { setLoadingModels(false); }
+    try {
+      const names = desktop ? await commands.models(config) : await fetchBrowserModels(config);
+      setModels(names);
+      log(`${names.length} models found for ${config.provider}. Choose one from the model field.`);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setLoadingModels(false);
+    }
   }
   function changeTheme() {
     const theme = config.theme === 'dark' ? 'amoled' : config.theme === 'amoled' ? 'light' : 'dark';
@@ -209,8 +280,19 @@ export default function App() {
       />
       {!desktop && (
         <div className="web-banner">
-          <span><b>LIVE WEB STUDIO</b> · Real OpenSCAD runs locally in your browser through WebAssembly. No upload and no API key.</span>
-          <a href="https://github.com/serdevir91/openscad-ai#desktop-app" target="_blank" rel="noreferrer">Desktop AI features ↗</a>
+          <span><b>LIVE WEB STUDIO</b> · Real OpenSCAD WebAssembly runs in your browser. Add your free Gemini API key to generate models with AI!</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline' }}>
+              Get Free Gemini Key ↗
+            </a>
+            <button
+              type="button"
+              onClick={() => setSettings(true)}
+              style={{ padding: '3px 8px', fontSize: '11px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Configure Key
+            </button>
+          </div>
         </div>
       )}
       <main>
@@ -226,18 +308,22 @@ export default function App() {
             activeSkillsCount={activeSkills.length}
             webMode={!desktop}
             onPrompt={setPrompt}
-            onConfig={setConfig}
+            onConfig={updateConfig}
             onImage={file => void selectImage(file)}
             onClearImage={() => setImage(undefined)}
             onGenerate={() => void work('generate')}
+            onCompileOnly={() => void work('render')}
+            onOpenSettings={() => setSettings(true)}
             onModels={() => void refreshModels()}
             onCancel={() => void commands.cancel().catch(fail)}
             onOpenSkills={() => setSkillsModalOpen(true)}
             onAnalyze={() => {
-              if (!desktop) { fail('Image analysis is available in the desktop app.'); return; }
               if (image) void run(async () => {
                 log('Analyzing reference image…');
-                setPrompt(await commands.analyze(config, image));
+                const brief = desktop
+                  ? await commands.analyze(config, image)
+                  : await analyzeImageInBrowser(config, image);
+                setPrompt(brief);
                 log('Design brief ready.');
               });
             }}
