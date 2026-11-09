@@ -1,4 +1,4 @@
-import { Box, Settings, Sun, Moon, PanelLeftClose, PanelLeft, BookCheck } from 'lucide-react';
+import { Box, Settings, Sun, Moon, PanelLeftClose, PanelLeft, BookCheck, Plug } from 'lucide-react';
 import type { Theme } from '../hooks/useTauriCommands';
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
   activeSkillsCount: number;
   onTheme: () => void;
   onSettings: () => void;
+  onConnections: () => void;
   onToggleSidebar: () => void;
   onOpenSkills: () => void;
 };
@@ -30,7 +31,7 @@ export default function Header(p: Props) {
           <Box size={24} />
         </div>
         <strong>OpenSCAD <em>AI</em></strong>
-        <span className="edition">DESIGN WORKSHOP / 02</span>
+        <span className="edition">DESIGN WORKSHOP / 03</span>
       </div>
       <div className="header-actions">
         <button
@@ -50,6 +51,10 @@ export default function Header(p: Props) {
         <button disabled={p.disabled} title="Cycle theme" onClick={p.onTheme}>
           {p.theme === 'light' ? <Sun size={17} /> : <Moon size={17} />}
           <span>{p.theme}</span>
+        </button>
+        <button disabled={p.disabled} onClick={p.onConnections}>
+          <Plug size={17} />
+          Connections
         </button>
         <button disabled={p.disabled} onClick={p.onSettings}>
           <Settings size={17} />

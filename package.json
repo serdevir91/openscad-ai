@@ -1,6 +1,6 @@
 {
   "name": "openscad-ai",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "description": "Native AI-assisted parametric CAD studio built with Tauri, Rust, Three.js, and Monaco Editor.",
   "private": true,
   "license": "GPL-3.0-or-later",
@@ -23,6 +23,7 @@
     "preweb": "npm run setup:wasm",
     "web": "vite --host 127.0.0.1",
     "setup:wasm": "node scripts/fetch-openscad-wasm.mjs",
+    "eval": "vitest run --config eval/vitest.config.ts",
     "build": "tsc && vite build",
     "build:web": "npm run setup:wasm && tsc && vite build --mode web",
     "build:app": "tauri build --no-bundle",
@@ -31,12 +32,14 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@monaco-editor/react": "^4.7",
     "@tauri-apps/api": "^2",
     "lucide-react": "^0.468",
     "monaco-editor": "^0.52",
     "react": "^19",
     "react-dom": "^19",
+    "replicad-opencascadejs": "^1.2.1",
     "three": "^0.180"
   },
   "devDependencies": {

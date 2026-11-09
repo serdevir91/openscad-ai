@@ -1,13 +1,8 @@
-import { Sparkles, ImagePlus, X, BookOpen, Square, BookCheck, KeyRound, Play } from 'lucide-react';
-import type { Config, Provider, ReferenceImage } from '../hooks/useTauriCommands';
+import { Sparkles, ImagePlus, X, BookOpen, Square, BookCheck, Plug, Play } from 'lucide-react';
+import type { Config, ProviderStatus, ReferenceImage } from '../hooks/useTauriCommands';
+import { available, provider as providerInfo } from '../ai/providers';
+import { selectProvider } from './ConnectionsModal';
 import ModelSelector from './ModelSelector';
-
-export const defaultModels: Record<Provider, string> = {
-  gemini: 'gemini-2.5-flash',
-  openai: 'gpt-4o',
-  ollama: 'qwen2.5-coder:7b',
-  codex: 'gpt-5.3-codex',
-};
 
 type Props = {
   config: Config;
@@ -19,6 +14,7 @@ type Props = {
   loadingModels: boolean;
   activeSkillsCount: number;
   webMode: boolean;
+  status: Record<string, ProviderStatus>;
   onPrompt: (v: string) => void;
   onConfig: (v: Config) => void;
   onImage: (file?: File) => void;
@@ -29,7 +25,7 @@ type Props = {
   onCancel: () => void;
   onModels: () => void;
   onOpenSkills: () => void;
-  onOpenSettings: () => void;
+  onOpenConnections: () => void;
 };
 
 export default function PromptSidebar(p: Props) {
@@ -104,18 +100,18 @@ export default function PromptSidebar(p: Props) {
         </button>
       </div>
 
-      <label className="field-label" htmlFor="provider">AI PROVIDER</label>
+      <div className="field-row">
+        <label className="field-label" htmlFor="provider">AI PROVIDER</label>
+        <button type="button" className="link-button" onClick={p.onOpenConnections}><Plug size={11} />Connections</button>
+      </div>
       <select
         id="provider"
         value={p.config.provider}
         disabled={p.busy}
-        onChange={e => {
-          const provider = e.target.value as Provider;
-          p.onConfig({ ...p.config, provider, model: defaultModels[provider] });
-        }}
+        onChange={e => p.onConfig(selectProvider(p.config, providerInfo(e.target.value)))}
       >
-        {(p.webMode ? (['gemini', 'openai'] as Provider[]) : (Object.keys(defaultModels) as Provider[])).map(provider => (
-          <option key={provider} value={provider}>{provider.toUpperCase()}</option>
+        {available(!p.webMode).map(item => (
+          <option key={item.id} value={item.id}>{(p.status[item.id]?.ready || p.config.keys[item.id]?.trim() ? '● ' : '○ ') + item.name}</option>
         ))}
       </select>
 
@@ -126,47 +122,37 @@ export default function PromptSidebar(p: Props) {
         fetchedModels={p.models}
         loadingModels={p.loadingModels}
         disabled={p.busy}
-        onChangeModel={m => p.onConfig({ ...p.config, model: m })}
+        onChangeModel={m => p.onConfig({ ...p.config, model: m, models: { ...p.config.models, [p.config.provider]: m } })}
         onRefreshModels={p.onModels}
       />
 
-      {p.webMode && (
-        <div className="web-api-notice" style={{ margin: '12px 0 6px', padding: '10px 12px', background: 'var(--sub)', border: '1px solid var(--border)', borderRadius: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600, fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <KeyRound size={13} />
-              {p.config.provider === 'gemini'
-                ? (p.config.gemini_key?.trim() ? 'Gemini Key Configured' : 'Google Gemini Key')
-                : (p.config.openai_key?.trim() ? 'OpenAI Key Configured' : 'OpenAI Key')}
-            </span>
-            <button
-              type="button"
-              onClick={p.onOpenSettings}
-              style={{ padding: '3px 8px', fontSize: '10px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              {p.config.gemini_key?.trim() || p.config.openai_key?.trim() ? 'Change' : 'Add key'}
-            </button>
-          </div>
-          {!(p.config.provider === 'gemini' ? p.config.gemini_key?.trim() : p.config.openai_key?.trim()) && (
-            <div style={{ fontSize: '10px', color: 'var(--muted)', lineHeight: '1.45', marginTop: '5px' }}>
-              <span>Enter your API key to generate models with AI in the browser.</span>
-              <br />
-              <a
-                href={p.config.provider === 'gemini' ? 'https://aistudio.google.com/app/apikey' : 'https://platform.openai.com/api-keys'}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: 'var(--accent)', textDecoration: 'underline', fontWeight: 600, display: 'inline-block', marginTop: '3px' }}
-              >
-                {p.config.provider === 'gemini' ? 'Get free Gemini key (Google AI Studio) ↗' : 'Get OpenAI API key ↗'}
-              </a>
-            </div>
-          )}
-        </div>
+      <div className="mode-switch" role="radiogroup" aria-label="Generation mode">
+        {(['precise', 'fast'] as const).map(mode => (
+          <button
+            key={mode}
+            type="button"
+            role="radio"
+            aria-checked={p.config.mode === mode}
+            className={p.config.mode === mode ? 'selected' : ''}
+            disabled={p.busy}
+            title={mode === 'precise' ? 'Plans the dimensions, measures the result, and repairs until it matches' : 'One pass that only repairs compile errors'}
+            onClick={() => p.onConfig({ ...p.config, mode })}
+          >
+            {mode === 'precise' ? 'Precise' : 'Fast'}
+          </button>
+        ))}
+      </div>
+
+      {p.status[p.config.provider] && !p.status[p.config.provider].ready && !p.config.keys[p.config.provider]?.trim() && (
+        <button type="button" className="setup-notice" onClick={p.onOpenConnections}>
+          <Plug size={13} />
+          <span>Set up {providerInfo(p.config.provider).name} to generate designs</span>
+        </button>
       )}
 
       <button
         className="primary generate"
-        disabled={p.busy || !p.ready || (!p.prompt.trim() && !p.webMode)}
+        disabled={p.busy || !p.ready || !p.prompt.trim()}
         onClick={p.onGenerate}
         title="Generate OpenSCAD model from natural language prompt"
       >
@@ -211,10 +197,10 @@ export default function PromptSidebar(p: Props) {
       <div className="sidebar-note">
         <BookOpen size={16} />
         <p>
-          {p.webMode ? <>Official OpenSCAD WebAssembly<br /><b>Runs locally in this tab</b></> : <>OpenSCAD documentation context<br /><b>Compile + automatic repair</b></>}
+          {p.config.mode === 'precise' ? <>Plan, measure, repair<br /><b>Checked against your dimensions</b></> : <>One pass<br /><b>Repairs compile errors only</b></>}
         </p>
       </div>
-      {p.config.provider === 'codex' && <div className="codex-inline-note"><span>●</span>Uses your local Codex CLI login · no API key</div>}
+      {providerInfo(p.config.provider).group === 'cli' && <div className="codex-inline-note"><span>●</span>Uses your {providerInfo(p.config.provider).name} sign-in · no API key</div>}
       <div className="sidebar-foot">NATURAL LANGUAGE · REAL GEOMETRY</div>
     </aside>
   );

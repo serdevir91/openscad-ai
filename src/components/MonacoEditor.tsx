@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import Editor, { loader, type OnMount } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import Worker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import type { Diagnostic } from '../cad/diagnostics';
 
 self.MonacoEnvironment = { getWorker: () => new Worker() };
 loader.config({ monaco });
@@ -77,12 +79,30 @@ interface MonacoEditorProps {
   theme: string;
   disabled: boolean;
   onRun?: () => void;
+  diagnostics?: Diagnostic[];
 }
 
-export default function MonacoEditor({ code, onChange, theme, disabled, onRun }: MonacoEditorProps) {
+export default function MonacoEditor({ code, onChange, theme, disabled, onRun, diagnostics = [] }: MonacoEditorProps) {
+  const model = useRef<monaco.editor.ITextModel | null>(null);
+  const run = useRef(onRun);
+  run.current = onRun;
+
+  useEffect(() => {
+    if (!model.current) return;
+    monaco.editor.setModelMarkers(model.current, 'openscad', diagnostics.filter(item => item.line).map(item => ({
+      severity: item.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+      message: item.message,
+      startLineNumber: item.line!,
+      endLineNumber: item.line!,
+      startColumn: 1,
+      endColumn: 1000,
+    })));
+  }, [diagnostics]);
+
   const handleEditorDidMount: OnMount = (editor, monacoInstance) => {
+    model.current = editor.getModel();
     editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter, () => {
-      onRun?.();
+      run.current?.();
     });
   };
 

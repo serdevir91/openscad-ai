@@ -8,7 +8,7 @@ type OpenScadModule = {
 };
 
 type OpenScadFactory = (options: Record<string, unknown>) => Promise<OpenScadModule>;
-type CompileRequest = { id: number; code: string; baseUrl: string };
+type CompileRequest = { id: number; code: string; baseUrl: string; format: string };
 
 let factoryPromise: Promise<OpenScadFactory> | undefined;
 let wasmBinaryPromise: Promise<ArrayBuffer> | undefined;
@@ -45,7 +45,8 @@ function cleanLog(lines: string[]): string {
 }
 
 self.onmessage = async (event: MessageEvent<CompileRequest>) => {
-  const { id, code, baseUrl } = event.data;
+  const { id, code, baseUrl, format } = event.data;
+  const target = `/output.${format}`;
   const output: string[] = [];
 
   try {
@@ -65,7 +66,9 @@ self.onmessage = async (event: MessageEvent<CompileRequest>) => {
     });
 
     openscad.FS.writeFile('/input.scad', code);
-    const status = openscad.callMain(['/input.scad', '-o', '/output.stl']);
+    const flags = format === 'csg' ? [] : ['--backend=manifold'];
+    if (format === 'stl') flags.push('--export-format', 'binstl');
+    const status = openscad.callMain(['/input.scad', '-o', target, ...flags]);
     const log = cleanLog(output);
 
     if (status !== 0) {
@@ -74,17 +77,17 @@ self.onmessage = async (event: MessageEvent<CompileRequest>) => {
 
     let bytes: Uint8Array;
     try {
-      bytes = openscad.FS.readFile('/output.stl');
+      bytes = openscad.FS.readFile(target);
     } catch {
-      throw new Error(log || 'OpenSCAD produced no STL output geometry.');
+      throw new Error(log || 'OpenSCAD produced no output geometry.');
     }
 
     if (bytes.length === 0) {
-      throw new Error('Generated STL model is empty.');
+      throw new Error('The geometry is empty.');
     }
 
     const exact = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    self.postMessage({ id, ok: true, stl: exact, log }, { transfer: [exact] });
+    self.postMessage({ id, ok: true, bytes: exact, log }, { transfer: [exact] });
   } catch (error) {
     const log = cleanLog(output);
     const msg = error instanceof Error ? error.message : String(error);

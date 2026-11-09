@@ -2,10 +2,12 @@
 
 ## Architecture
 
-- `src/`: React 19 and TypeScript desktop interface.
-- `src-tauri/src/`: Rust core and Tauri IPC commands.
-- `src-tauri/src/ai/`: Gemini, OpenAI, Ollama, and local Codex CLI adapters.
-- `src-tauri/src/pipeline.rs`: generation, OpenSCAD validation, and auto-repair.
+- `src/ai/`: provider registry, prompts, plan checks, generation loop, and desktop/browser transport.
+- `src/cad/`: mesh measurement, CSG tree, B-rep, STEP, 3MF, rendered views, and diagnostics.
+- `src/workers/`: OpenSCAD and STEP WebAssembly workers.
+- `src/`: React 19 and TypeScript desktop interface, including the Connections and Verification panels.
+- `src-tauri/src/ai/`: HTTP and CLI provider adapters (`mod.rs`, `http.rs`, `cli.rs`).
+- `src-tauri/src/openscad.rs`: OpenSCAD discovery and process execution.
 - `src-tauri/src/config.rs`: atomic local settings persistence.
 - `src-tauri/src/files.rs`: output listing, guarded reads, and native save dialogs.
 
@@ -19,11 +21,20 @@ rtk npm run build
 rtk cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+Optional: `npm run eval` runs `eval/design.eval.ts` with a real model and OpenSCAD. It spends provider quota and is not part of `npm test`.
+
+Live CLI adapter tests run only when requested:
+
+```powershell
+rtk cargo test --manifest-path src-tauri/Cargo.toml -- --ignored live_
+```
+
 ## Security rules
 
 - Never commit API keys, tokens, credentials, runtime configuration, or generated models.
 - Never print provider keys in logs or errors.
-- Keep Codex CLI execution shell-free and sandboxed.
+- Keep API keys in the local app-data config file or browser `localStorage`, and send them only to the chosen provider.
+- Keep CLI provider execution shell-free and sandboxed.
 - Keep output-file reads constrained to the configured output directory.
 - Preserve process timeouts and cancellation behavior.
 - Prefer environment variables for optional Gemini and OpenAI keys.
@@ -37,7 +48,7 @@ rtk cargo test --manifest-path src-tauri/Cargo.toml
 
 ## Core data
 
-- `Config`: provider, model, optional cloud keys, OpenSCAD path, Codex path, output directory, theme, and repair limit.
+- `Config`: provider, model, models, keys, base URLs, paths, OpenSCAD path, output directory, theme, max repairs, mode, render timeout, and onboarding state. Legacy `gemini_key`, `openai_key`, and `codex_path` fields are migrated on load.
 - `Request`: prompt, current code, optional reference image, and active design rules.
 - `Artifact`: validated SCAD code, base64 STL preview, and generated name.
 

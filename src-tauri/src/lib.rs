@@ -3,7 +3,6 @@ mod config;
 mod docs;
 mod files;
 mod openscad;
-mod pipeline;
 
 use std::path::PathBuf;
 use tauri::{Manager, State};
@@ -62,14 +61,44 @@ fn save_config(s: State<AppState>, config: config::Config) -> Result<(), String>
     config::save(&s.dir, &config)
 }
 
-#[tauri::command]
-fn detect_openscad(s: State<AppState>) -> Result<String, String> {
-    openscad::detect(&config::load(&s.dir)?.openscad_path).map(|p| p.display().to_string())
+#[derive(serde::Serialize)]
+struct OpenScadStatus {
+    path: String,
+    version: String,
 }
 
 #[tauri::command]
-fn detect_codex(config: config::Config) -> Result<String, String> {
-    ai::codex::detect(&config.codex_path).map(|path| path.display().to_string())
+async fn detect_openscad(s: State<'_, AppState>) -> Result<OpenScadStatus, String> {
+    let path = openscad::detect(&config::load(&s.dir)?.openscad_path)?;
+    let version = openscad::version(&path).await;
+    Ok(OpenScadStatus {
+        path: path.display().to_string(),
+        version,
+    })
+}
+
+#[tauri::command]
+async fn detect_providers(config: config::Config) -> Vec<ai::Status> {
+    let mut found = Vec::new();
+    for provider in ai::PROVIDERS {
+        found.push(ai::status(&config, provider).await);
+    }
+    found
+}
+
+#[tauri::command]
+async fn test_provider(config: config::Config) -> Result<String, String> {
+    let request = ai::Completion {
+        prompt: "Reply with exactly: OK".into(),
+        timeout: Some(90),
+        ..Default::default()
+    };
+    ai::complete(&config, &config.provider, &request).await
+}
+
+#[tauri::command]
+fn open_login(config: config::Config, provider: String) -> Result<(), String> {
+    ai::cli::open_login(&config, &provider)
 }
 
 #[tauri::command]
@@ -85,19 +114,54 @@ async fn choose_output_directory(current: String) -> Result<Option<String>, Stri
 }
 
 #[tauri::command]
-async fn generate(
-    app: tauri::AppHandle,
-    s: State<'_, AppState>,
-    request: pipeline::Request,
-) -> Result<pipeline::Artifact, String> {
+async fn ai_complete(s: State<'_, AppState>, request: ai::Completion) -> Result<String, String> {
     let config = config::load(&s.dir)?;
-    cancellable(&s, pipeline::generate(&app, &s.dir, &config, request)).await
+    cancellable(&s, ai::complete(&config, &config.provider, &request)).await
+}
+
+/// Compiles SCAD source. The reply is binary: a little-endian log length, the log, the file.
+#[tauri::command]
+async fn compile_scad(
+    s: State<'_, AppState>,
+    code: String,
+    format: String,
+) -> Result<tauri::ipc::Response, String> {
+    if code.len() > 4_000_000 {
+        return Err("The code exceeds the 4 MB limit".into());
+    }
+    if !openscad::FORMATS.contains(&format.as_str()) {
+        return Err("Invalid export format".into());
+    }
+    let config = config::load(&s.dir)?;
+    cancellable(&s, async {
+        let exe = openscad::detect(&config.openscad_path)?;
+        let tmp = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let source = tmp.path().join("model.scad");
+        let output = tmp.path().join(format!("model.{format}"));
+        tokio::fs::write(&source, &code)
+            .await
+            .map_err(|e| e.to_string())?;
+        let log = openscad::compile(&exe, &source, &output, config.render_timeout).await?;
+        let bytes = tokio::fs::read(output).await.map_err(|e| e.to_string())?;
+        if bytes.len() > 400_000_000 {
+            return Err("The output exceeds the 400 MB limit".into());
+        }
+        let mut reply = Vec::with_capacity(bytes.len() + log.len() + 4);
+        reply.extend_from_slice(&(log.len() as u32).to_le_bytes());
+        reply.extend_from_slice(log.as_bytes());
+        reply.extend_from_slice(&bytes);
+        Ok(tauri::ipc::Response::new(reply))
+    })
+    .await
 }
 
 #[tauri::command]
-async fn render(s: State<'_, AppState>, code: String) -> Result<pipeline::Artifact, String> {
-    let config = config::load(&s.dir)?;
-    cancellable(&s, pipeline::render(&s.dir, &config, &code)).await
+async fn docs_context(s: State<'_, AppState>, prompt: String) -> Result<String, String> {
+    if docs::stale(&s.dir) {
+        // A failed refresh only means an older cache, or none.
+        let _ = docs::sync(&s.dir).await;
+    }
+    Ok(docs::context(&s.dir, &prompt))
 }
 
 #[tauri::command]
@@ -106,50 +170,111 @@ async fn sync_docs(s: State<'_, AppState>) -> Result<usize, String> {
 }
 
 #[tauri::command]
-async fn list_models(config: config::Config) -> Result<Vec<String>, String> {
-    ai::models::list(&config).await
+async fn list_models(config: config::Config, provider: String) -> Result<Vec<String>, String> {
+    ai::models(&config, &provider).await
 }
 
+/// Keeps the SCAD source and its mesh in the output folder. The body is a little-endian
+/// source length, the source, then the STL.
 #[tauri::command]
-async fn analyze_image(
+async fn save_output(
     s: State<'_, AppState>,
-    config: config::Config,
-    image: ai::Image,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<String, String> {
-    image.validate()?;
-    let provider = ai::provider(&config.provider)?;
-    cancellable(&s, provider.generate(&config,
-        "Describe this object as a precise English CAD design brief for OpenSCAD. Describe shapes, relative dimensions, and suggested parameters. Clearly label dimensions inferred from the image as estimates. Return a design brief, not code.", Some(&image))).await
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err("Expected the design as binary data".into());
+    };
+    let (code, stl) = split_design(body)?;
+    let outputs = config::outputs(&s.dir)?;
+    let name = format!(
+        "model-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
+    tokio::fs::write(outputs.join(format!("{name}.scad")), code)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::fs::write(outputs.join(format!("{name}.stl")), stl)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(name)
 }
 
+fn split_design(body: &[u8]) -> Result<(&[u8], &[u8]), String> {
+    let invalid = || "Invalid design data".to_string();
+    let (head, rest) = body.split_at_checked(4).ok_or_else(invalid)?;
+    let length = u32::from_le_bytes(head.try_into().map_err(|_| invalid())?) as usize;
+    rest.split_at_checked(length).ok_or_else(invalid)
+}
+
+/// Opens a web page in the default browser. Only https links are accepted.
 #[tauri::command]
-async fn export_file(
-    s: State<'_, AppState>,
-    code: String,
-    format: String,
-) -> Result<Option<String>, String> {
-    if code.len() > 1_000_000 {
-        return Err("SCAD files cannot exceed 1 MB".into());
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("Only https links can be opened".into());
     }
-    if !["scad", "stl", "png"].contains(&format.as_str()) {
-        return Err("Invalid export format".into());
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut c = std::process::Command::new("rundll32");
+        c.arg("url.dll,FileProtocolHandler");
+        c
+    };
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let mut command = std::process::Command::new("xdg-open");
+    command.arg(url).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Opens a save dialog for a file the web view already built, such as a STEP export.
+#[tauri::command]
+async fn save_bytes(request: tauri::ipc::Request<'_>) -> Result<Option<String>, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected binary data".into());
+    };
+    let name = request
+        .headers()
+        .get("x-name")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("design.bin");
+    if name.contains(['/', '\\', ':']) {
+        return Err("Invalid file name".into());
     }
-    cancellable(&s, async {
-        if format == "scad" {
-            return files::save("design.scad", code.as_bytes(), "scad").await;
-        }
-        let config = config::load(&s.dir)?;
-        let tmp = tempfile::tempdir().map_err(|e| e.to_string())?;
-        let source = tmp.path().join("model.scad");
-        let output = tmp.path().join(format!("model.{format}"));
-        tokio::fs::write(&source, code)
-            .await
-            .map_err(|e| e.to_string())?;
-        openscad::compile(&openscad::detect(&config.openscad_path)?, &source, &output).await?;
-        let bytes = tokio::fs::read(output).await.map_err(|e| e.to_string())?;
-        files::save(&format!("design.{format}"), &bytes, &format).await
-    })
-    .await
+    let extension = name.rsplit('.').next().unwrap_or("bin");
+    files::save(name, bytes, extension).await
+}
+
+#[derive(serde::Serialize)]
+struct Release {
+    version: String,
+    url: String,
+}
+
+/// The newest published release, or nothing when the repository has none yet.
+#[tauri::command]
+async fn latest_release() -> Result<Option<Release>, String> {
+    let reply = reqwest::Client::new()
+        .get("https://api.github.com/repos/serdevir91/openscad-ai/releases/latest")
+        .header("user-agent", "openscad-ai")
+        .header("accept", "application/vnd.github+json")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|_| "The update server could not be reached".to_string())?;
+    if reply.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    let value: serde_json::Value = reply
+        .json()
+        .await
+        .map_err(|_| "The update server returned invalid data".to_string())?;
+    Ok(value["tag_name"].as_str().map(|tag| Release {
+        version: tag.trim_start_matches('v').to_string(),
+        url: value["html_url"].as_str().unwrap_or_default().to_string(),
+    }))
 }
 
 #[tauri::command]
@@ -183,19 +308,37 @@ pub fn run() {
             load_config,
             save_config,
             detect_openscad,
-            detect_codex,
+            detect_providers,
+            test_provider,
+            open_login,
             choose_output_directory,
-            generate,
-            render,
+            ai_complete,
+            compile_scad,
+            docs_context,
             sync_docs,
-            export_file,
+            save_output,
+            save_bytes,
+            open_url,
+            latest_release,
             output_directory,
             cancel_operation,
             list_models,
-            analyze_image,
             list_outputs,
             read_output
         ])
         .run(tauri::generate_context!())
         .expect("Tauri could not start");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_design;
+    #[test]
+    fn a_design_body_splits_into_source_and_mesh() {
+        let mut body = 3u32.to_le_bytes().to_vec();
+        body.extend_from_slice(b"abcSTL");
+        assert_eq!(split_design(&body).unwrap(), (&b"abc"[..], &b"STL"[..]));
+        assert!(split_design(&[1, 0]).is_err());
+        assert!(split_design(&9u32.to_le_bytes()).is_err());
+    }
 }

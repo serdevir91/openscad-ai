@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { Box, RotateCcw, ScanLine, Palette } from 'lucide-react';
+import { Box, BoxSelect, RotateCcw, ScanLine, Palette } from 'lucide-react';
 
 const MATERIALS = [
   { id: 'amber', name: 'CAD Amber', color: 0xf3a65a, rough: 0.35, metal: 0.25 },
@@ -11,10 +11,11 @@ const MATERIALS = [
   { id: 'cyan', name: 'Blueprint Cyan', color: 0x38bdf8, rough: 0.3, metal: 0.35 },
 ];
 
-export default function Viewport3D({ stl, theme }: { stl?: string; theme: string }) {
+export default function Viewport3D({ stl, theme, size }: { stl?: Uint8Array; theme: string; size?: number[] }) {
   const host = useRef<HTMLDivElement>(null);
   const setCameraAngle = useRef<(angle: 'iso' | 'top' | 'front' | 'side') => void>(() => {});
   const [wire, setWire] = useState(false);
+  const [bounds, setBounds] = useState(false);
   const [matIndex, setMatIndex] = useState(0);
   const [error, setError] = useState('');
 
@@ -71,8 +72,7 @@ export default function Viewport3D({ stl, theme }: { stl?: string; theme: string
 
     if (stl) {
       try {
-        const bytes = Uint8Array.from(atob(stl), c => c.charCodeAt(0));
-        geometry = new STLLoader().parse(bytes.buffer);
+        geometry = new STLLoader().parse(stl.slice().buffer as ArrayBuffer);
         geometry.computeVertexNormals();
         geometry.computeBoundingBox();
         const box = geometry.boundingBox!;
@@ -80,6 +80,7 @@ export default function Viewport3D({ stl, theme }: { stl?: string; theme: string
         radius = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
         const mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);
+        if (bounds) scene.add(new THREE.Box3Helper(box, 0x38bdf8));
         grid.position.z = box.min.z - 0.02;
         grid.scale.setScalar(Math.max(radius / 150, 0.1));
       } catch (e) {
@@ -137,7 +138,7 @@ export default function Viewport3D({ stl, theme }: { stl?: string; theme: string
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [stl, theme, wire, matIndex, currentMat]);
+  }, [stl, theme, wire, bounds, matIndex, currentMat]);
 
   const cycleMaterial = () => {
     setMatIndex((matIndex + 1) % MATERIALS.length);
@@ -155,6 +156,9 @@ export default function Viewport3D({ stl, theme }: { stl?: string; theme: string
         <button title={`Material: ${currentMat.name}`} onClick={cycleMaterial}>
           <Palette size={14} style={{ color: '#' + currentMat.color.toString(16).padStart(6, '0') }} />
         </button>
+        <button title="Bounding box" aria-pressed={bounds} onClick={() => setBounds(!bounds)}>
+          <BoxSelect size={15} />
+        </button>
         <button title="Wireframe" aria-pressed={wire} onClick={() => setWire(!wire)}>
           <ScanLine size={16} />
         </button>
@@ -170,6 +174,10 @@ export default function Viewport3D({ stl, theme }: { stl?: string; theme: string
         </div>
       )}
       {error && <div className="empty error">{error}</div>}
+      {size && <div className="dimensions" aria-label="Overall size in millimetres">
+        {size.map((value, axis) => <span key={axis}><b>{'XYZ'[axis]}</b>{value.toFixed(2)}</span>)}
+        <small>mm</small>
+      </div>}
       <div className="axis">
         <b>Z</b>
         <span>Y</span>

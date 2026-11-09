@@ -2,7 +2,7 @@
   <img src="src-tauri/icons/icon.png" alt="OpenSCAD AI" width="96">
 </p>
 
-<h1 align="center">OpenSCAD AI v0.2</h1>
+<h1 align="center">OpenSCAD AI v0.5.0</h1>
 
 <p align="center">
   A native AI-assisted parametric CAD studio built with Tauri 2, Rust, Three.js, and Monaco Editor.
@@ -12,7 +12,7 @@
   <a href="https://serdevir91.github.io/openscad-ai/"><strong>Launch the live web studio</strong></a> ·
   <a href="#features">Features</a> ·
   <a href="#quick-start">Quick start</a> ·
-  <a href="#codex-cli-without-an-api-key">Codex CLI</a> ·
+  <a href="#connections">Connections</a> ·
   <a href="#build">Build</a> ·
   <a href="#security">Security</a>
 </p>
@@ -25,27 +25,31 @@
 
 ## Live web studio
 
-Open the **[interactive browser demo](https://serdevir91.github.io/openscad-ai/)** to generate 3D CAD designs from text or reference sketches, adjust detected parameters, compile real geometry with OpenSCAD WebAssembly, inspect it in Three.js, and export SCAD or STL files.
+Open the **[interactive browser demo](https://serdevir91.github.io/openscad-ai/)** to generate 3D CAD designs from text or reference sketches, adjust detected parameters, compile real geometry with OpenSCAD WebAssembly, inspect it in Three.js, and export SCAD, STL, 3MF, STEP, or PNG files.
 
-- **In-Browser AI Generation**: You can use your own Google Gemini (free key available via [Google AI Studio](https://aistudio.google.com/app/apikey)) or OpenAI API key directly in the web app. Keys are stored strictly in client-side `localStorage` and sent directly to provider CORS endpoints.
-- **Client-Side OpenSCAD WASM Engine**: The official headless OpenSCAD engine runs via WebAssembly inside a background web worker. Geometry is compiled and validated completely locally within your browser tab.
-- **Self-Healing Auto-Repair**: If generated code fails OpenSCAD compilation, the web studio automatically feeds the compiler error back to the AI for iterative self-repair.
+- Web Studio offers six provider options: Google Gemini, OpenAI, Anthropic, OpenRouter, Ollama, and a custom OpenAI-compatible endpoint. API keys are stored in browser `localStorage` and sent directly to the chosen provider.
+- The official headless OpenSCAD engine runs via WebAssembly inside web workers. Geometry is compiled and validated locally in the browser tab.
+- Code that fails compilation is fed back to the model for repair before the result is shown.
 
-*Note: Local process integrations (Codex CLI subprocess, local Ollama, and desktop PNG snapshots) require the native desktop application.*
+Sign-in CLI providers (Claude Code, Codex CLI, Gemini CLI, OpenCode, Antigravity), the remaining API-key providers, native OpenSCAD detection, native save dialogs, and the update check are available in the desktop application.
 
 ## Features
 
 - Natural-language and reference-image design generation
-- Local Codex CLI integration using your existing sign-in, with no API key required
-- Gemini, OpenAI, and local Ollama provider support
-- OpenSCAD compilation, geometry validation, STL generation, and automatic repair
-- GPU-accelerated Three.js STL viewport with orbit, pan, zoom, camera presets, materials, and wireframe mode
+- "Precise" pipeline, the default: the model writes a measurable plan, writes parametric OpenSCAD, compiles and measures the mesh, compares the result against the plan, repairs exact failures, and optionally reviews four rendered views with a vision model
+- "Fast" mode: a single pass that only repairs compile errors
+- Verification panel listing every check, viewport X/Y/Z size readout with a bounding box toggle, and OpenSCAD errors shown as editor markers
+- 16 providers, including five sign-in CLIs that need no API key and local or custom endpoints
+- OpenSCAD compile and validation through an installed OpenSCAD binary or the bundled WebAssembly build
+- Exports to SCAD, STL, 3MF, STEP, and PNG in both the desktop app and Web Studio
+- STEP export as true B-rep: analytic faces where possible, meshed features joined, and a faceted fallback when the exact solid fails validation
+- Three.js viewport with orbit, pan, zoom, camera presets, materials, and wireframe mode
 - Monaco Editor with OpenSCAD syntax highlighting and `Ctrl+Enter` compilation
 - Collapsible assistant and code panels for a focused full-width viewport
 - Parametric controls generated from top-level OpenSCAD variables and `// [min:step:max]` metadata
 - Selectable persistent output folder
-- Native SCAD, STL, and PNG export dialogs
-- GitHub Pages web studio with real in-browser OpenSCAD WebAssembly compilation and SCAD/STL downloads
+- Update check at startup and in Settings against GitHub Releases
+- Star prompt after the third design that passes, plus a Rate button in Settings
 - Dark, light, and pure-black AMOLED themes
 - Official OpenSCAD documentation cache with prompt-relevant context
 - Persistent custom CAD rules for print tolerances and modeling conventions
@@ -54,53 +58,75 @@ Open the **[interactive browser demo](https://serdevir91.github.io/openscad-ai/)
 
 ```text
 React + TypeScript
-├── Prompt, image, provider, model, and CAD-rule controls
+├── src/ai: provider registry, prompts, plan checks, pipeline loop, transport
+├── src/cad: mesh, CSG tree, B-rep, STEP, 3MF, rendered views, diagnostics
+├── src/workers: OpenSCAD and STEP WebAssembly workers
 ├── Monaco OpenSCAD editor
-├── Three.js STL viewport
+├── Three.js viewport and verification panel
 └── Typed Tauri IPC client
             │
             ▼
 Rust + Tauri 2
 ├── OpenSCAD process runner and validation
-├── Generation and auto-repair pipeline
-├── Gemini / OpenAI / Ollama HTTP clients
-├── Local Codex CLI process adapter
+├── HTTP and CLI provider adapters
+├── Generation transport and cancellation
 ├── Documentation cache and context selection
-└── Safe configuration and output-file management
+└── Safe configuration, output-file management, and dialogs
 ```
 
 Python is not required by the application or its build process.
+
+## Precision pipeline
+
+"Precise" mode is the default. It runs these steps:
+
+1. The model writes a measurable plan: dimensions, holes, bodies, and assumptions.
+2. The model writes parametric OpenSCAD for that plan.
+3. The app compiles the model and measures the mesh: bounding box, volume, watertight state, body count, and through holes.
+4. The measured result is compared against the plan, and exact failures are fed back for repair. Three repairs are allowed by default; the setting accepts up to five.
+5. When a vision model is available, four rendered views are inspected.
+
+The best model seen during the run is kept. "Fast" mode is a single pass that only repairs compile errors.
+
+## Exports
+
+The desktop app and Web Studio both export SCAD, STL, 3MF, STEP, and PNG. 3MF is written by the application from the mesh because the OpenSCAD WebAssembly build writes empty 3MF files.
+
+### STEP
+
+STEP export produces a true B-rep, not a mesh wrapper. The OpenSCAD `.csg` tree is rebuilt in OpenCascade (WebAssembly, in a worker) and written as AP214 STEP.
+
+- Cylinders, cones, spheres, extrusions, and revolves become analytic faces. The log reports this result as "exact".
+- Features with no analytic form, such as hull, minkowski, and text, are meshed and joined. The log reports this result as "mixed".
+- If the exact solid fails validation against the mesh, the whole model is exported as a faceted solid. The log reports this result as "faceted".
+- Circles with `$fn` below 16 stay polygons on purpose, such as hex nuts.
 
 ## Desktop app
 
 ### Windows Installer (Inno Setup)
 
-An all-in-one Windows installer setup script is provided under `installer/`:
+A Windows installer is built from an Inno Setup script under `installer/`:
 - Bundles the native **OpenSCAD AI** desktop application.
-- Automatically detects an existing OpenSCAD installation; if missing, it downloads and silently installs the official **OpenSCAD 3D Engine**.
+- Detects an existing OpenSCAD installation and offers an optional download and silent install of the official **OpenSCAD 3D Engine** when none is found.
 - Offers an optional checkbox to install **Codex CLI** (`@openai/codex`) via npm.
-- Creates clean Start Menu, Web Studio, and Desktop shortcuts with bilingual support (Turkish & English).
+- Creates Start Menu, Web Studio, and Desktop shortcuts with bilingual support (Turkish and English).
 
 To build the setup executable:
 ```powershell
 npm run build:installer
 # Or double-click installer\build-installer.bat
 ```
-Output: `dist-installer/OpenSCAD-AI-Setup-0.2.0.exe`
+Output: `dist-installer/OpenSCAD-AI-Setup-<version>.exe`, where `<version>` is set in `installer/OpenSCAD-AI-Setup.iss`.
 
 ## Quick start
 
 ### Requirements
 
-- Windows 10 or 11
-- [OpenSCAD](https://openscad.org/downloads.html)
+- Windows 10 or 11, macOS, or Linux
 - Node.js 20 or newer
 - Current stable Rust toolchain
-- One AI provider:
-  - Codex CLI with an existing login
-  - Ollama running locally
-  - Gemini API key
-  - OpenAI API key
+- One AI provider: a sign-in CLI, an API key, or a local endpoint
+- OpenSCAD is optional. The desktop app uses an installed OpenSCAD when it finds one, including the standard macOS application locations, and enables the Manifold backend on releases from 2024. Otherwise it falls back to the bundled WebAssembly build.
 
 ### Clone and run
 
@@ -119,28 +145,24 @@ npm run web
 
 The first web run downloads a checksum-pinned OpenSCAD WebAssembly build from the official OpenSCAD file host. The generated runtime directory is ignored by Git.
 
-After a release build, double-click `run-app.bat`. It automatically opens the release executable when one is available and falls back to development mode otherwise.
+On Windows, after a release build, double-click `run-app.bat`. It opens the release executable when one is available and falls back to development mode otherwise.
 
-## Codex CLI without an API key
+## Connections
 
-OpenSCAD AI can call the locally installed Codex CLI directly. It does not need an OpenAI API key for this provider.
+The **Connections** screen is opened from the header button. It shows each provider's status, a key field where applicable, a **Get a key** link, the install command for CLIs, a **Sign in** action for CLIs, and a **Test connection** action. On first launch the desktop app selects the first CLI it finds; if none is found, it opens Connections.
 
-1. Install the Codex CLI.
-2. Run `codex login` in a terminal and complete the normal sign-in flow.
-3. Open **Settings → Codex CLI** and click **Check connection**.
-4. Select **Codex** in the design assistant.
-5. Enter a model ID available to your Codex account.
+Sign-in CLIs need no API key. Install the CLI, sign in with its own tool, then test the connection in the app. Authentication remains owned by the local CLI installation.
 
-The app launches `codex exec` with an ephemeral, read-only sandbox and passes the design prompt over standard input. Authentication remains owned by the local Codex CLI installation.
+The app launches CLI processes without a shell, in a temporary folder, with tools disabled or read-only where the CLI supports it, and with process timeouts and cancellation. The design prompt is passed over standard input.
 
 ## Using the workspace
 
 1. Describe the object in the assistant panel or attach a PNG, JPEG, or WebP reference.
 2. Choose a provider and model. Enabled design rules are added to the generation request.
-3. Generate the design. The Rust core validates the returned SCAD with OpenSCAD and repairs compiler failures up to the configured limit.
-4. Inspect the STL in the viewport. Hide the code editor when you want a full-width geometry view.
+3. Generate the design. The pipeline validates the returned SCAD, measures the mesh, and repairs failures up to the configured limit.
+4. Review the Verification panel and the X/Y/Z size readout in the viewport. Hide the code editor when you want a full-width geometry view.
 5. Edit code directly or change detected parameters. Press `Ctrl+Enter` to compile.
-6. Export SCAD, STL, or PNG, or open an automatically saved model from the selected output folder.
+6. Export SCAD, STL, 3MF, STEP, or PNG, or open an automatically saved model from the selected output folder.
 
 ## Output folder
 
@@ -148,14 +170,30 @@ Open **Settings → Files & rendering → Output folder** and select any writabl
 
 ## Providers
 
-| Provider | Authentication | Endpoint or process |
-|---|---|---|
-| Codex CLI | Existing local `codex login` session | Local `codex exec` process |
-| Ollama | None | `http://127.0.0.1:11434` |
-| Gemini | `GEMINI_API_KEY` or local Settings | Google Gemini REST API |
-| OpenAI | `OPENAI_API_KEY` or local Settings | OpenAI Chat Completions API |
+There are 16 providers in the desktop app.
 
-Environment variables are preferred for cloud-provider keys:
+| Provider | Authentication | Notes |
+|---|---|---|
+| Claude Code | Existing CLI sign-in | Local process, no API key |
+| Codex CLI | Existing CLI sign-in | Local process, no API key |
+| Gemini CLI | Existing CLI sign-in | Local process, no API key |
+| OpenCode | Existing CLI sign-in | Local process, no API key |
+| Antigravity | Existing CLI sign-in | Local process, no API key |
+| Google Gemini | API key | Gemini API |
+| OpenAI | API key | OpenAI API |
+| Anthropic | API key | Anthropic API |
+| OpenRouter | API key | OpenRouter API |
+| Groq | API key | Groq API |
+| DeepSeek | API key | DeepSeek API |
+| Mistral | API key | Mistral API |
+| xAI | API key | xAI API |
+| Ollama | None | `http://127.0.0.1:11434` by default |
+| LM Studio | None | Local server |
+| Custom | None or API key | Any OpenAI-compatible endpoint |
+
+Web Studio offers only Gemini, OpenAI, Anthropic, OpenRouter, Ollama, and Custom.
+
+Environment variables are preferred for optional cloud-provider keys:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
@@ -177,10 +215,13 @@ npm run build:web
 # Rust tests
 cargo test --manifest-path src-tauri/Cargo.toml
 
+# Optional evaluation with a real model and OpenSCAD (spends provider quota)
+EVAL_PROVIDER=opencode npm run eval
+
 # Optimized executable without an installer
 npm run build:app
 
-# Inno Setup Windows installer (auto OpenSCAD download + optional Codex CLI)
+# Inno Setup Windows installer (optional OpenSCAD download + optional Codex CLI)
 npm run build:installer
 # Or run installer\build-installer.bat
 
@@ -196,15 +237,29 @@ src-tauri/target/release/openscad-ai.exe
 
 ## Configuration
 
-Settings are saved atomically to `.openscad_ai_config.json` in the operating system application-data directory. The project directory never receives runtime API keys. Theme, output folder, provider, model, executable paths, and repair limits persist across launches.
+Settings are saved atomically to `.openscad_ai_config.json` in the operating system application-data directory. The file holds:
+
+- `provider`, `model`, `models`
+- `keys`, `base_urls`, `paths`
+- `openscad_path`, `output_dir`
+- `theme`, `max_repairs`, `mode`, `render_timeout`, `onboarded`
+
+The legacy `gemini_key`, `openai_key`, and `codex_path` fields are migrated on load. The project directory never receives runtime API keys.
+
+## Updates and support
+
+The desktop app checks GitHub Releases for updates at startup and from Settings. After the third design that passes, it offers a star prompt; Settings also has a Rate button. There is no in-app purchase: OpenSCAD AI is free GPL software.
 
 ## Security
 
 - Runtime configuration, `.env` files, key material, generated models, build output, and executables are ignored by Git.
-- API keys are never printed to the operation log.
-- Codex CLI and Ollama require no API key in this application.
+- API keys live only in the local app-data config file (owner-only permissions on Unix) or in browser `localStorage` for Web Studio, and are sent directly to the chosen provider.
+- Errors scrub keys. Keys are never printed to the operation log.
+- Sign-in CLI providers and local endpoints such as Ollama require no API key in this application.
+- Every CLI runs without a shell, in a temporary folder, with tools disabled or read-only where the CLI allows it, and with process timeouts and cancellation.
+- Browser calls send Gemini keys in the `x-goog-api-key` header, not in the URL.
+- Links open through a command that accepts `https` only.
 - Output-file reads validate names and remain inside the selected output directory.
-- External processes have explicit timeouts and are terminated when cancelled.
 - GitHub Actions runs frontend tests, Rust tests, production builds, and a Gitleaks scan.
 - The web build downloads OpenSCAD WASM from the official OpenSCAD host and rejects it unless its SHA-256 checksum matches the pinned value.
 
@@ -219,10 +274,30 @@ See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the OpenSCAD WebAssembl
 
 ## Development notes
 
-- `src/` contains the React application.
-- `src-tauri/src/` contains Rust commands and services.
-- `src-tauri/capabilities/default.json` contains the minimal Tauri capability set.
-- `dist/`, `node_modules/`, `src-tauri/target/`, generated outputs, and all local configuration are intentionally excluded from version control.
+Code layout:
+
+- `src/ai/`: `providers.ts` (provider registry), `prompts.ts`, `spec.ts` (plan checks), `pipeline.ts` (generation loop), `transport.ts` (desktop and browser calls).
+- `src/cad/`: `mesh.ts`, `csg.ts`, `brep.ts`, `step.ts`, `stepClient.ts`, `threeMf.ts`, `views.ts`, `diagnostics.ts`.
+- `src/workers/`: `openscad.worker.ts`, `step.worker.ts`.
+- `src-tauri/src/ai/`: `mod.rs`, `http.rs`, `cli.rs`.
+- `src-tauri/src/openscad.rs`: OpenSCAD discovery and process execution.
+- `src-tauri/src/config.rs`: atomic settings persistence.
+- `src-tauri/capabilities/default.json`: minimal Tauri capability set.
+
+Tests:
+
+```powershell
+# Unit and integration tests; the evaluation is not part of this run
+npm test
+
+# Optional evaluation with a real model and OpenSCAD; spends provider quota
+EVAL_PROVIDER=opencode npm run eval
+
+# Live CLI adapter tests
+cargo test --manifest-path src-tauri/Cargo.toml -- --ignored live_
+```
+
+`dist/`, `node_modules/`, `src-tauri/target/`, generated outputs, and all local configuration are intentionally excluded from version control.
 
 ## License
 

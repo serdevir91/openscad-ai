@@ -1,38 +1,15 @@
 import { useState } from 'react';
-import { Sparkles, RefreshCw, ChevronDown, Check, Cpu } from 'lucide-react';
-import type { Provider } from '../hooks/useTauriCommands';
+import { RefreshCw, ChevronDown, Check } from 'lucide-react';
+import { provider as providerInfo } from '../ai/providers';
 
 type Props = {
-  provider: Provider;
+  provider: string;
   currentModel: string;
   fetchedModels: string[];
   loadingModels: boolean;
   disabled: boolean;
   onChangeModel: (model: string) => void;
   onRefreshModels: () => void;
-};
-
-type Preset = { id: string; label: string; tag: string };
-
-const PRESETS: Record<Provider, Preset[]> = {
-  gemini: [
-    { id: 'gemini-2.5-flash', label: 'Flash 2.5', tag: '⚡ Fast CAD' },
-    { id: 'gemini-2.5-pro', label: 'Pro 2.5', tag: '🧠 Advanced' },
-    { id: 'gemini-2.0-flash', label: 'Flash 2.0', tag: '🚀 Standard' },
-  ],
-  openai: [
-    { id: 'gpt-4o', label: 'GPT-4o', tag: '🧠 Advanced' },
-    { id: 'gpt-4o-mini', label: '4o Mini', tag: '⚡ Fast' },
-    { id: 'o3-mini', label: 'o3 Mini', tag: '🎯 Reasoning' },
-  ],
-  ollama: [
-    { id: 'qwen2.5-coder:7b', label: 'Qwen Coder 7B', tag: '💻 Yerel Kod' },
-    { id: 'deepseek-r1:8b', label: 'DeepSeek R1', tag: '🧠 Reasoning' },
-    { id: 'codellama', label: 'CodeLlama', tag: '📐 Klasik' },
-  ],
-  codex: [
-    { id: 'gpt-5.3-codex', label: 'Codex 5.3', tag: '⚡ Default' },
-  ],
 };
 
 export default function ModelSelector({
@@ -45,7 +22,7 @@ export default function ModelSelector({
   onRefreshModels,
 }: Props) {
   const [showAll, setShowAll] = useState(false);
-  const presets = PRESETS[provider] || [];
+  const presets = providerInfo(provider).presets;
 
   return (
     <div className="model-selector">
@@ -53,7 +30,7 @@ export default function ModelSelector({
         <label className="field-label" style={{ margin: 0 }}>MODEL</label>
         <button
           title="Refresh models from the server or API"
-          disabled={disabled || loadingModels || provider === 'codex'}
+          disabled={disabled || loadingModels}
           onClick={onRefreshModels}
           style={{ padding: '3px 7px', fontSize: '10px', height: '22px', border: 'none', color: 'var(--muted)' }}
         >
@@ -76,7 +53,6 @@ export default function ModelSelector({
               title={p.id}
             >
               <span>{p.label}</span>
-              <span className="model-pill-tag">{p.tag}</span>
             </button>
           );
         })}
@@ -90,7 +66,7 @@ export default function ModelSelector({
             aria-label="Active model name"
             value={currentModel}
             disabled={disabled}
-            placeholder="Enter or choose a model…"
+            placeholder={providerInfo(provider).model || 'Provider default'}
             onChange={e => onChangeModel(e.target.value)}
             style={{ paddingRight: '28px' }}
           />

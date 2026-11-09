@@ -8,10 +8,10 @@ try {
   // fallback if already realpath
 }
 
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig(({ mode }) => ({
   base: mode === 'web' ? '/openscad-ai/' : '/',
-  publicDir: command === 'serve' || mode === 'web' ? 'public' : false,
   plugins: [react()],
+  worker: { format: 'es' },
   server: {
     host: '127.0.0.1',
     port: 1420,
