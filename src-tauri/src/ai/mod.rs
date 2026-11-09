@@ -139,7 +139,7 @@ mod tests {
     use super::*;
     #[test]
     fn hides_keys_in_messages() {
-        assert_eq!(scrub("bad key sk-abcdef1234", "sk-abcdef1234"), "bad key [key hidden]");
+        assert_eq!(scrub("bad token FAKEVALUE99", "FAKEVALUE99"), "bad token [key hidden]");
         assert_eq!(scrub("no key here", ""), "no key here");
     }
     #[test]
